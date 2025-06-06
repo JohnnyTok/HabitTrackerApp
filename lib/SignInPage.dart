@@ -224,7 +224,7 @@ class SignInPage extends StatelessWidget {
                           ),
                           const SizedBox(height: 20),
                           
-                          // Social Login
+                          // Social Login - CORRECTED SECTION
                           const Row(
                             children: [
                               Expanded(child: Divider()),
@@ -240,13 +240,15 @@ class SignInPage extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
+                              // CORRECTED: Use icon property for IconButton
                               IconButton(
-                                icon: Image.asset('assets/google.png', width: 40),
+                                icon: const Icon(Icons.facebook, size: 30, color: Colors.blue),
                                 onPressed: () {},
                               ),
                               const SizedBox(width: 20),
+                              // CORRECTED: Use icon property for IconButton
                               IconButton(
-                                icon: Image.asset('assets/facebook.png', width: 40),
+                                icon: const Icon(Icons.g_mobiledata, size: 30, color: Colors.red),
                                 onPressed: () {},
                               ),
                             ],
