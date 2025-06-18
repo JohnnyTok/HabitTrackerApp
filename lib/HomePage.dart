@@ -4,7 +4,8 @@ import 'ProfilePage.dart';
 import 'HabitManagementPage.dart';
 import 'LogoutPage.dart';
 import 'ProgressPage.dart';
-import 'HelpSupportPage.dart'; // <-- Add this import
+import 'HelpSupportPage.dart';
+import 'SettingsPage.dart'; // <-- Add this import
 
 class HomePage extends StatefulWidget {
   final String username;
@@ -514,11 +515,12 @@ class AppDrawer extends StatelessWidget {
                     page: ProgressPage(habits: habits),
                   ),
                   const Divider(),
+
                   _buildDrawerItem(
                     context,
                     icon: Icons.settings,
                     title: 'Settings',
-                    page: Container(), // Placeholder
+                    page: SettingsPage(), // Placeholder
                   ),
                   // FIX: Link Help & Support to the real page
                   _buildDrawerItem(
