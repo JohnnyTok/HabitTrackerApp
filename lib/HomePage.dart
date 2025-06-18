@@ -4,8 +4,10 @@ import 'ProfilePage.dart';
 import 'HabitManagementPage.dart';
 import 'LogoutPage.dart';
 import 'ProgressPage.dart';
+import 'StreakPage.dart';
 import 'HelpSupportPage.dart';
 import 'SettingsPage.dart'; // <-- Add this import
+import 'streaks_rewards_widget.dart'; // <-- Use only the correct Habit model import
 
 class HomePage extends StatefulWidget {
   final String username;
@@ -22,15 +24,15 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController searchController = TextEditingController();
   bool isSearching = false;
   int selectedDayIndex = DateTime.now().weekday - 1;
-  Map<int, bool> habitCompletionStatus = {};
+  Map<int, Map<String, bool>> habitCompletionStatus = {};
 
   @override
   void initState() {
     super.initState();
-    // Initialize completion status for all habits
     for (int i = 0; i < habits.length; i++) {
-      habitCompletionStatus[i] = false;
+      habitCompletionStatus[i] ??= {};
     }
+    loadAllStreaks(); // <-- Load streaks on startup
   }
 
   @override
@@ -189,56 +191,65 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildStatsSummary() {
-    int completedCount =
-        habitCompletionStatus.values.where((status) => status).length;
-    int totalCount = getFilteredHabits().length;
-    double progress = totalCount > 0 ? completedCount / totalCount : 0;
+  List<DateTime> weekDates = _getCurrentWeekDates();
+  String dateKey = DateFormat('yyyy-MM-dd').format(weekDates[selectedDayIndex]);
+  int completedCount = 0;
+  int totalCount = getFilteredHabits().length;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.teal[50],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'DAILY PROGRESS',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.teal,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: Colors.grey[300],
-                  color: Colors.teal,
-                  minHeight: 8,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                '${(progress * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$completedCount of $totalCount habits completed',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-        ],
-      ),
-    );
+  for (var entry in getFilteredHabits().asMap().entries) {
+    int index = entry.key;
+    if (habitCompletionStatus[index]?[dateKey] ?? false) {
+      completedCount++;
+    }
   }
+
+  double progress = totalCount > 0 ? completedCount / totalCount : 0;
+
+  return Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.teal[50],
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'DAILY PROGRESS',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.teal,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: Colors.grey[300],
+                color: Colors.teal,
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              '${(progress * 100).toStringAsFixed(0)}%',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$completedCount of $totalCount habits completed',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildHabitList() {
     return ListView(
@@ -253,65 +264,80 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHabitCard(int index, Map<String, String> habit) {
-    bool isCompleted = habitCompletionStatus[index] ?? false;
-    String timeString = habit['time'] ?? '';
-    DateTime? habitTime;
+  List<DateTime> weekDates = _getCurrentWeekDates();
+  String dateKey = DateFormat('yyyy-MM-dd').format(weekDates[selectedDayIndex]);
+  bool isCompleted = habitCompletionStatus[index]?[dateKey] ?? false;
 
-    try {
-      habitTime = DateFormat('yyyy-MM-dd HH:mm').parse(timeString);
-    } catch (e) {
-      // Handle parsing error
-    }
+  String timeString = habit['time'] ?? '';
+  DateTime? habitTime;
 
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
+  try {
+    habitTime = DateFormat('yyyy-MM-dd HH:mm').parse(timeString);
+  } catch (e) {
+    // Handle parsing error
+  }
+
+  return Card(
+    elevation: 2,
+    margin: const EdgeInsets.only(bottom: 12),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 12,
+      ),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.teal[50],
+          shape: BoxShape.circle,
         ),
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: Colors.teal[50],
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            _getCategoryIcon(habit['category']),
-            color: Colors.teal[800],
-          ),
-        ),
-        title: Text(
-          habit['name'] ?? 'Unnamed Habit',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            decoration:
-                isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
-            color: isCompleted ? Colors.grey : Colors.black,
-          ),
-        ),
-        subtitle:
-            habitTime != null
-                ? Text(
-                  DateFormat('h:mm a').format(habitTime),
-                  style: TextStyle(
-                    color: isCompleted ? Colors.grey[400] : Colors.grey[600],
-                  ),
-                )
-                : null,
-        trailing: Checkbox(
-          value: isCompleted,
-          activeColor: Colors.teal,
-          onChanged:
-              (value) =>
-                  setState(() => habitCompletionStatus[index] = value ?? false),
+        child: Icon(
+          _getCategoryIcon(habit['category']),
+          color: Colors.teal[800],
         ),
       ),
-    );
-  }
+      title: Text(
+        habit['name'] ?? 'Unnamed Habit',
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          decoration:
+              isCompleted ? TextDecoration.lineThrough : TextDecoration.none,
+          color: isCompleted ? Colors.grey : Colors.black,
+        ),
+      ),
+      subtitle: habitTime != null
+          ? Text(
+              DateFormat('h:mm a').format(habitTime),
+              style: TextStyle(
+                color: isCompleted ? Colors.grey[400] : Colors.grey[600],
+              ),
+            )
+          : null,
+      trailing: Checkbox(
+        value: isCompleted,
+        activeColor: Colors.teal,
+        onChanged: (value) async {
+          setState(() {
+            habitCompletionStatus[index] ??= {};
+            habitCompletionStatus[index]![dateKey] = value ?? false;
+          });
+          if (value == true) {
+            final habitObj = Habit.fromMapInternal(habit);
+            habitObj.currentStreak = int.tryParse(habit['currentStreak'] ?? '0') ?? 0;
+            habitObj.longestStreak = int.tryParse(habit['longestStreak'] ?? '0') ?? 0;
+            habitObj.updateStreak(true);
+            setState(() {
+              habits[index]['currentStreak'] = habitObj.currentStreak.toString();
+              habits[index]['longestStreak'] = habitObj.longestStreak.toString();
+            });
+          }
+        },
+      ),
+    ),
+  );
+}
 
   IconData _getCategoryIcon(String? category) {
     switch (category?.toLowerCase()) {
@@ -360,7 +386,7 @@ class _HomePageState extends State<HomePage> {
       habits = updatedHabits;
       // Update completion status for new habits
       for (int i = 0; i < habits.length; i++) {
-        habitCompletionStatus.putIfAbsent(i, () => false);
+        habitCompletionStatus.putIfAbsent(i, () => {'completed': false});
       }
     });
   }
@@ -451,6 +477,18 @@ class _HomePageState extends State<HomePage> {
     DateTime monday = now.subtract(Duration(days: currentWeekday - 1));
     return List.generate(7, (index) => monday.add(Duration(days: index)));
   }
+
+  Future<void> loadAllStreaks() async {
+    for (int i = 0; i < habits.length; i++) {
+      final habitObj = Habit.fromMapInternal(habits[i]);
+      await habitObj.loadStreak();
+      // Update the habit map with loaded streaks
+      habits[i]['currentStreak'] = habitObj.currentStreak.toString();
+      habits[i]['longestStreak'] = habitObj.longestStreak.toString();
+      // Optionally update badges if you want to persist them too
+    }
+    setState(() {});
+  }
 }
 
 class AppDrawer extends StatelessWidget {
@@ -513,6 +551,19 @@ class AppDrawer extends StatelessWidget {
                     icon: Icons.bar_chart,
                     title: 'Progress',
                     page: ProgressPage(habits: habits),
+                  ),
+
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.whatshot,
+                    title: 'Streak',
+                    page: StreakPage(
+                      habits: Habit.groupAndMergeByName(
+                        habits
+                            .map((habitMap) => Habit.fromMapInternal(habitMap))
+                            .toList(),
+                      ),
+                    ),
                   ),
                   const Divider(),
 

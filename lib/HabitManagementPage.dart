@@ -13,6 +13,8 @@ class HabitManagementPage extends StatefulWidget {
 
   @override
   _HabitManagementPageState createState() => _HabitManagementPageState();
+
+  static fromMap(Map<String, String> habitMap) {}
 }
 
 class _HabitManagementPageState extends State<HabitManagementPage> {
