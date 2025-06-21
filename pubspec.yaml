@@ -5,7 +5,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.2
+  sdk: '>=3.0.0 <4.0.0' # Adjusted to be compatible with latest Flutter/Dart versions
 
 dependencies:
   flutter:
@@ -16,12 +16,14 @@ dependencies:
 
   # For internationalization
   intl: ^0.18.1
+  percent_indicator: ^4.2.3 # Updated to match common latest version
+  uuid: ^4.2.1 # Added the uuid package - THIS IS CRUCIAL FOR THE APP TO WORK
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  flutter_lints: ^3.0.1 # updated to match Dart 3.7 compatibility
+  flutter_lints: ^3.0.1
 
 flutter:
   uses-material-design: true
