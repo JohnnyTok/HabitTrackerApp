@@ -2,8 +2,15 @@ import 'package:flutter/material.dart';
 
 class ProfilePage extends StatefulWidget {
   final String username;
+  final String email;
+  final Function(String, String) onUpdateProfile;
 
-  const ProfilePage({super.key, required this.username});
+  const ProfilePage({
+    super.key,
+    required this.username,
+    required this.email,
+    required this.onUpdateProfile,
+  });
 
   @override
   _ProfilePageState createState() => _ProfilePageState();
@@ -20,8 +27,9 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _usernameController = TextEditingController(text: widget.username);
-    _emailController = TextEditingController(text: '${widget.username}@gmail.com');
-    _memberSinceController = TextEditingController(text: 'January 2025');
+    _emailController = TextEditingController(text: widget.email);
+    // For demonstration, member since is static.
+    _memberSinceController = TextEditingController(text: 'June 2025');
   }
 
   @override
@@ -33,34 +41,50 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _toggleEditMode() {
-    setState(() {
-      if (_isEditing) {
-        // Validate and save changes when exiting edit mode
-        if (_formKey.currentState!.validate()) {
-          _formKey.currentState!.save();
-        }
+    if (_isEditing) {
+      // If saving, first validate the form.
+      if (_formKey.currentState!.validate()) {
+        _formKey.currentState!.save();
+
+        // Call the callback to pass the new data to HomePage.
+        widget.onUpdateProfile(
+          _usernameController.text,
+          _emailController.text,
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Exit edit mode ONLY if save is successful.
+        setState(() {
+          _isEditing = false;
+        });
       }
-      _isEditing = !_isEditing;
-    });
+    } else {
+      // If not editing, just enter edit mode.
+      setState(() {
+        _isEditing = true;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Profile',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.teal,
+        title: const Text('Profile'),
         actions: [
           IconButton(
             icon: Icon(_isEditing ? Icons.check : Icons.edit),
             onPressed: _toggleEditMode,
+            tooltip: _isEditing ? 'Save Changes' : 'Edit Profile',
           ),
         ],
       ),
-      backgroundColor: Colors.grey[100],
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -70,7 +94,6 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // User avatar with a placeholder icon
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: Colors.teal,
@@ -86,7 +109,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const SizedBox(height: 20),
                   
-                  // Editable username field
                   _isEditing
                       ? TextFormField(
                           controller: _usernameController,
@@ -116,7 +138,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   
                   const SizedBox(height: 8),
                   
-                  // Email display (non-editable)
                   Text(
                     _emailController.text,
                     style: TextStyle(
@@ -127,7 +148,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   
                   const SizedBox(height: 30),
                   
-                  // Account details card
                   Card(
                     elevation: 3,
                     shape: RoundedRectangleBorder(
@@ -139,7 +159,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Title for the details card
                           const Text(
                             'Account Details',
                             style: TextStyle(
@@ -148,8 +167,6 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ),
                           const SizedBox(height: 20),
-                          
-                          // Editable detail rows
                           _buildEditableDetailRow('Name', _usernameController, _isEditing),
                           const Divider(),
                           _buildEditableDetailRow('Email', _emailController, _isEditing),
@@ -162,74 +179,21 @@ class _ProfilePageState extends State<ProfilePage> {
                   
                   const SizedBox(height: 30),
                   
-                  // Save button
-                  if (_isEditing) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            _formKey.currentState!.save();
-                            setState(() {
-                              _isEditing = false;
-                            });
-                            
-                            // Show success message
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Profile updated successfully!'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          textStyle: const TextStyle(fontSize: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text('Save Changes'),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
+                  if (_isEditing)
                     SizedBox(
                       width: double.infinity,
                       child: TextButton(
                         onPressed: () {
                           setState(() {
                             _isEditing = false;
-                            // Reset to original values
+                            // Reset to the actual original values passed to the widget
                             _usernameController.text = widget.username;
-                            _emailController.text = '${widget.username}@gmail.com';
+                            _emailController.text = widget.email;
                           });
                         },
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
                         child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
                       ),
-                    ),
-                  ] else ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _toggleEditMode,
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Edit Profile'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          textStyle: const TextStyle(fontSize: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                    )
                 ],
               ),
             ),
@@ -239,7 +203,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // Helper method for building editable detail rows
   Widget _buildEditableDetailRow(String title, TextEditingController controller, bool editable) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
