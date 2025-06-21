@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:habit_tracker_app/HelpSupportPage.dart';
+import 'package:habit_tracker_app/SettingPage.dart';
 import 'package:intl/intl.dart';
 import 'ProfilePage.dart';
 import 'HabitManagementPage.dart';
@@ -7,52 +9,80 @@ import 'ProgressPage.dart';
 
 class HomePage extends StatefulWidget {
   final String username;
+  final String email;
 
-  const HomePage({super.key, required this.username});
+  const HomePage({super.key, required this.username, required this.email});
 
   @override
   _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
+  // State for user profile data
+  late String _currentUsername;
+  late String _currentEmail;
+  
+  // State for habits
   List<Map<String, String>> habits = [];
+  Map<String, bool> habitCompletionStatus = {};
+
+  // State for UI
   String searchQuery = '';
   final TextEditingController searchController = TextEditingController();
   bool isSearching = false;
-  int selectedDayIndex = DateTime.now().weekday - 1;
-  Map<int, bool> habitCompletionStatus = {};
+  DateTime selectedDate = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    // Initialize completion status for all habits
-    for (int i = 0; i < habits.length; i++) {
-      habitCompletionStatus[i] = false;
-    }
+    // Initialize profile state with data passed from SignInPage
+    _currentUsername = widget.username;
+    _currentEmail = widget.email;
+  }
+
+  // Callback function to update user profile from ProfilePage
+  void _updateUserProfile(String newName, String newEmail) {
+    setState(() {
+      _currentUsername = newName;
+      _currentEmail = newEmail;
+    });
+  }
+
+  // Callback function to update habits from HabitManagementPage
+  void updateHabits(List<Map<String, String>> updatedHabits) {
+    setState(() {
+      habits = updatedHabits;
+      for (var habit in habits) {
+        habitCompletionStatus.putIfAbsent(habit['id']!, () => false);
+      }
+    });
+  }
+
+  List<DateTime> get currentMonthDates {
+    final now = selectedDate;
+    final firstDayOfMonth = DateTime(now.year, now.month, 1);
+    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
+    return List.generate(lastDayOfMonth.day, (i) => firstDayOfMonth.add(Duration(days: i)));
   }
 
   @override
   Widget build(BuildContext context) {
-    List<DateTime> weekDates = _getCurrentWeekDates();
-
     return Scaffold(
       appBar: AppBar(
         title: isSearching
             ? TextField(
                 controller: searchController,
                 autofocus: true,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   hintText: "Search habits...",
                   border: InputBorder.none,
-                  prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                  hintStyle: const TextStyle(color: Colors.white70),
+                  prefixIcon: Icon(Icons.search, color: Colors.white70),
+                  hintStyle: TextStyle(color: Colors.white70),
                 ),
                 style: const TextStyle(color: Colors.white),
                 onChanged: (query) => setState(() => searchQuery = query),
               )
-            : const Text('Today', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.teal[800],
-        iconTheme: const IconThemeData(color: Colors.white),
+            : const Text('Today'),
         actions: [
           IconButton(
             icon: Icon(isSearching ? Icons.close : Icons.search),
@@ -67,57 +97,53 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       drawer: AppDrawer(
-        username: widget.username,
+        username: _currentUsername,
+        email: _currentEmail,
+        onUpdateProfile: _updateUserProfile, // Pass callback
         habits: habits,
         onUpdateHabits: updateHabits,
+        habitCompletionStatus: habitCompletionStatus,
       ),
-      body: Column(
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date selector container with fixed height
           Container(
-            height: 72,
+            width: 80,
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
                   color: Colors.grey.withOpacity(0.2),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                )
+                  blurRadius: 4,
+                  offset: const Offset(2, 0),
+                ),
               ],
             ),
-            child: _buildDateSelector(weekDates),
+            child: _buildVerticalDateScroller(),
           ),
-          
-          // Main content area
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header showing selected date
                   Padding(
                     padding: const EdgeInsets.only(top: 16, left: 8),
                     child: Text(
-                      'Habits for ${DateFormat('EEEE, MMMM dd').format(weekDates[selectedDayIndex])}',
+                      isSearching
+                          ? 'Search results for "$searchQuery"'
+                          : 'Habits for ${DateFormat('EEEE, MMMM dd').format(selectedDate)}',
                       style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.teal,
-                      ),
+                          fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
-                  // Stats summary
-                  _buildStatsSummary(),
-                  const SizedBox(height: 16),
-                  
-                  // FIX: Use Flexible instead of Expanded for variable content
-                  Flexible(
-                    flex: 1,
-                    child: habits.isEmpty
+                  if (!isSearching) ...[
+                    _buildStatsSummary(),
+                    const SizedBox(height: 16),
+                  ],
+                  Expanded(
+                    child: getFilteredHabits().isEmpty
                         ? _buildEmptyState()
                         : _buildHabitList(),
                   ),
@@ -128,76 +154,72 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.teal[800],
-        child: const Icon(Icons.add, color: Colors.white),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HabitManagementPage(
-              habits: habits,
-              onUpdateHabits: updateHabits,
+        tooltip: 'Add Habit',
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HabitManagementPage(
+                habits: habits,
+                onUpdateHabits: updateHabits,
+              ),
             ),
-          ),
-        ),
+          );
+          setState(() {});
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }
 
-  // FIX: Updated empty state with constrained height
   Widget _buildEmptyState() {
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.5,
-      ),
-      child: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.checklist, size: 60, color: Colors.teal[200]), // Reduced size
-              const SizedBox(height: 16), // Reduced spacing
-              const Text(
-                'No habits scheduled',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8), // Reduced spacing
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 40),
-                child: Text(
-                  'Add habits using the + button below or from Habit Management',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-            ],
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.start, size: 80, color: Colors.teal[200]),
+          const SizedBox(height: 16),
+          const Text(
+            'Ready to build habits?',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
-        ),
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              "Let's add your first one! Tap the + button to get started.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildStatsSummary() {
-    int completedCount = habitCompletionStatus.values.where((status) => status).length;
-    int totalCount = getFilteredHabits().length;
+    final todaysHabits = getFilteredHabits();
+    int completedCount = todaysHabits.where((h) => habitCompletionStatus[h['id']] == true).length;
+    int totalCount = todaysHabits.length;
     double progress = totalCount > 0 ? completedCount / totalCount : 0;
+    
+    if (totalCount == 0) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.teal[50],
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 4)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'DAILY PROGRESS',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.teal,
-            ),
-          ),
+          const Text('DAILY PROGRESS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.teal)),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -211,17 +233,11 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
-                '${(progress * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+              Text('${(progress * 100).toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            '$completedCount of $totalCount habits completed',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-          ),
+          Text('$completedCount of $totalCount habits completed', style: const TextStyle(fontSize: 12, color: Colors.grey)),
         ],
       ),
     );
@@ -229,24 +245,19 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildHabitList() {
     return ListView(
-      padding: const EdgeInsets.only(bottom: 16),
-      children: getFilteredHabits()
-          .asMap()
-          .entries
-          .map((entry) => _buildHabitCard(entry.key, entry.value))
-          .toList(),
+      padding: const EdgeInsets.only(bottom: 80),
+      children: getFilteredHabits().map((habit) => _buildHabitCard(habit)).toList(),
     );
   }
 
-  Widget _buildHabitCard(int index, Map<String, String> habit) {
-    bool isCompleted = habitCompletionStatus[index] ?? false;
+  Widget _buildHabitCard(Map<String, String> habit) {
+    bool isCompleted = habitCompletionStatus[habit['id']] ?? false;
     String timeString = habit['time'] ?? '';
     DateTime? habitTime;
-    
     try {
       habitTime = DateFormat('yyyy-MM-dd HH:mm').parse(timeString);
     } catch (e) {
-      // Handle parsing error
+      // Handle error
     }
     
     return Card(
@@ -275,18 +286,21 @@ class _HomePageState extends State<HomePage> {
             color: isCompleted ? Colors.grey : Colors.black,
           ),
         ),
-        subtitle: habitTime != null 
+        subtitle: habitTime != null
             ? Text(
-                DateFormat('h:mm a').format(habitTime),
-                style: TextStyle(
-                  color: isCompleted ? Colors.grey[400] : Colors.grey[600],
-                ),
+                isSearching 
+                    ? DateFormat('MMM dd, h:mm a').format(habitTime)
+                    : DateFormat('h:mm a').format(habitTime),
+                style: TextStyle(color: isCompleted ? Colors.grey[400] : Colors.grey[600]),
               )
             : null,
         trailing: Checkbox(
           value: isCompleted,
           activeColor: Colors.teal,
-          onChanged: (value) => setState(() => habitCompletionStatus[index] = value ?? false),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+          onChanged: (value) => setState(() => habitCompletionStatus[habit['id']!] = value ?? false),
         ),
       ),
     );
@@ -294,83 +308,57 @@ class _HomePageState extends State<HomePage> {
 
   IconData _getCategoryIcon(String? category) {
     switch (category?.toLowerCase()) {
-      case 'health':
-        return Icons.favorite;
-      case 'work':
-        return Icons.work;
-      case 'study':
-        return Icons.school;
-      case 'exercise':
-        return Icons.directions_run;
-      case 'personal':
-        return Icons.person;
-      case 'social':
-        return Icons.people;
-      default:
-        return Icons.check_circle;
+      case 'health': return Icons.favorite;
+      case 'work': return Icons.work;
+      case 'study': return Icons.school;
+      case 'exercise': return Icons.directions_run;
+      case 'personal': return Icons.person;
+      case 'social': return Icons.people;
+      default: return Icons.check_circle;
     }
   }
 
   List<Map<String, String>> getFilteredHabits() {
-    List<DateTime> weekDates = _getCurrentWeekDates();
-    DateTime selectedDate = weekDates[selectedDayIndex];
-
     return habits.where((habit) {
       bool matchesSearch = habit['name']!.toLowerCase().contains(searchQuery.toLowerCase());
-      try {
-        DateTime habitDate = DateFormat('yyyy-MM-dd HH:mm').parse(habit['time']!);
-        bool matchesDate = habitDate.year == selectedDate.year &&
-            habitDate.month == selectedDate.month &&
-            habitDate.day == selectedDate.day;
-        return matchesSearch && matchesDate;
-      } catch (e) {
-        return false;
+      if (!isSearching) {
+        try {
+          DateTime habitDate = DateFormat('yyyy-MM-dd HH:mm').parse(habit['time']!);
+          bool matchesDate = habitDate.year == selectedDate.year &&
+              habitDate.month == selectedDate.month &&
+              habitDate.day == selectedDate.day;
+          return matchesSearch && matchesDate;
+        } catch (e) {
+          return false;
+        }
       }
+      return matchesSearch;
     }).toList();
   }
 
-  void updateHabits(List<Map<String, String>> updatedHabits) {
-    setState(() {
-      habits = updatedHabits;
-      // Update completion status for new habits
-      for (int i = 0; i < habits.length; i++) {
-        habitCompletionStatus.putIfAbsent(i, () => false);
-      }
-    });
-  }
-
-  Widget _buildDateSelector(List<DateTime> dates) {
+  Widget _buildVerticalDateScroller() {
     DateTime today = DateTime.now();
     return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      itemCount: dates.length,
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: currentMonthDates.length,
       itemBuilder: (context, index) {
-        final date = dates[index];
-        bool isSelected = selectedDayIndex == index;
-        bool isToday = date.day == today.day && 
-                      date.month == today.month && 
-                      date.year == today.year;
+        final date = currentMonthDates[index];
+        bool isSelected = selectedDate.day == date.day && selectedDate.month == date.month;
+        bool isToday = date.day == today.day && date.month == today.month && date.year == today.year;
         
         return GestureDetector(
-          onTap: () => setState(() => selectedDayIndex = index),
+          onTap: () {
+            setState(() {
+              selectedDate = date;
+              if (isSearching) {
+                isSearching = false;
+                searchController.clear();
+                searchQuery = '';
+              }
+            });
+          },
           child: Container(
-            width: 64,
-            margin: const EdgeInsets.symmetric(horizontal: 6),
-            decoration: BoxDecoration(
-              color: isSelected ? Colors.teal[800] : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: isToday
-                  ? Border.all(color: Colors.teal, width: 2)
-                  : null,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                )
-              ],
-            ),
+            height: 72,
+            color: isSelected ? Colors.teal[800] : Colors.white,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -383,21 +371,12 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.white : Colors.teal[50],
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    date.day.toString(),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.teal[800] : Colors.teal,
-                    ),
+                Text(
+                  date.day.toString(),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : Colors.teal[800],
                   ),
                 ),
                 if (isToday && !isSelected)
@@ -419,25 +398,24 @@ class _HomePageState extends State<HomePage> {
       },
     );
   }
-
-  List<DateTime> _getCurrentWeekDates() {
-    DateTime now = DateTime.now();
-    int currentWeekday = now.weekday;
-    DateTime monday = now.subtract(Duration(days: currentWeekday - 1));
-    return List.generate(7, (index) => monday.add(Duration(days: index)));
-  }
 }
 
 class AppDrawer extends StatelessWidget {
   final String username;
+  final String email;
+  final Function(String, String) onUpdateProfile;
   final List<Map<String, String>> habits;
   final Function(List<Map<String, String>>) onUpdateHabits;
-
+  final Map<String, bool> habitCompletionStatus;
+  
   const AppDrawer({
     super.key,
     required this.username,
+    required this.email,
+    required this.onUpdateProfile,
     required this.habits,
     required this.onUpdateHabits,
+    required this.habitCompletionStatus,
   });
 
   @override
@@ -446,14 +424,13 @@ class AppDrawer extends StatelessWidget {
       child: SafeArea(
         child: Column(
           children: [
-            // Drawer header with user info
             UserAccountsDrawerHeader(
               accountName: Text(username, style: const TextStyle(fontWeight: FontWeight.bold)),
-              accountEmail: Text("$username@habitracker.com"),
+              accountEmail: Text(email),
               currentAccountPicture: CircleAvatar(
-                backgroundColor: Colors.teal[800],
+                backgroundColor: Colors.teal[900],
                 child: Text(
-                  username.substring(0, 1).toUpperCase(),
+                  username.isNotEmpty ? username.substring(0, 1).toUpperCase() : 'U',
                   style: const TextStyle(fontSize: 24, color: Colors.white),
                 ),
               ),
@@ -461,8 +438,6 @@ class AppDrawer extends StatelessWidget {
                 color: Colors.teal[800],
               ),
             ),
-            
-            // Navigation items
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
@@ -471,7 +446,11 @@ class AppDrawer extends StatelessWidget {
                     context,
                     icon: Icons.person,
                     title: 'Profile',
-                    page: ProfilePage(username: username),
+                    page: ProfilePage(
+                      username: username,
+                      email: email,
+                      onUpdateProfile: onUpdateProfile,
+                    ),
                   ),
                   _buildDrawerItem(
                     context,
@@ -486,27 +465,27 @@ class AppDrawer extends StatelessWidget {
                     context,
                     icon: Icons.bar_chart,
                     title: 'Progress',
-                    page: ProgressPage(habits: habits),
+                    page: ProgressPage(habits: habits, completionStatus: habitCompletionStatus),
                   ),
                   const Divider(),
                   _buildDrawerItem(
                     context,
                     icon: Icons.settings,
                     title: 'Settings',
-                    page: Container(), // Placeholder
+                    page: const SettingPage(), 
                   ),
                   _buildDrawerItem(
                     context,
                     icon: Icons.help,
                     title: 'Help & Support',
-                    page: Container(), // Placeholder
+                    page: const HelpSupportPage(), 
                   ),
                   const Divider(),
                   _buildDrawerItem(
                     context,
                     icon: Icons.logout,
                     title: 'Logout',
-                    page: LogoutPage(),
+                    page: const LogoutPage(),
                     isLogout: true,
                   ),
                 ],
@@ -530,13 +509,13 @@ class AppDrawer extends StatelessWidget {
       title: Text(
         title,
         style: TextStyle(
-          color: isLogout ? Colors.red : Colors.black,
+          color: isLogout ? Colors.red : Colors.black87,
           fontWeight: FontWeight.w500,
         ),
       ),
       trailing: isLogout ? null : const Icon(Icons.chevron_right, color: Colors.grey),
       onTap: () {
-        Navigator.pop(context); // Close drawer
+        Navigator.pop(context);
         if (isLogout) {
           Navigator.pushAndRemoveUntil(
             context,
