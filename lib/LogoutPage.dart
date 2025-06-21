@@ -7,11 +7,9 @@ class LogoutPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100], // Light background for a clean UI
       appBar: AppBar(
         title: const Text('Logout'),
-        backgroundColor: Colors.teal,
-        elevation: 0,
+        automaticallyImplyLeading: false, // No back button
       ),
       body: Center(
         child: Padding(
@@ -27,38 +25,34 @@ class LogoutPage extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(
-                    Icons.logout,
+                    Icons.check_circle_outline,
                     size: 60,
                     color: Colors.teal,
                   ),
                   const SizedBox(height: 20),
                   const Text(
-                    'You have been logged out successfully.',
+                    'You have been logged out.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 20),
+                   const SizedBox(height: 8),
+                  const Text(
+                    'See you soon!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text(
-                        'Back to Login',
-                        style: TextStyle(fontSize: 16),
-                      ),
                       onPressed: () {
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(builder: (context) => SignInPage()),
+                          MaterialPageRoute(builder: (context) => const SignInPage()),
                           (route) => false, // Prevents back navigation after logout
                         );
                       },
+                      child: const Text('Back to Login'),
                     ),
                   ),
                 ],
