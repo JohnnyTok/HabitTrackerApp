@@ -4,48 +4,75 @@ import 'package:percent_indicator/percent_indicator.dart';
 
 class ProgressPage extends StatefulWidget {
   final List<Map<String, String>> habits;
+  final Map<String, bool> completionStatus; // Pass the completion status from HomePage
 
-  const ProgressPage({super.key, required this.habits});
+  const ProgressPage({
+    super.key,
+    required this.habits,
+    required this.completionStatus, // Make completionStatus required
+  });
 
   @override
   _ProgressPageState createState() => _ProgressPageState();
 }
 
 class _ProgressPageState extends State<ProgressPage> {
-  late List<bool> completionStatus;
-  int _currentStreak = 7;
-  int _longestStreak = 14;
-  double _completionRate = 0.75;
+  // Use a map to store completion status for each habit based on its name (unique identifier)
+  // This makes it more robust if the list order changes.
+  // Note: For actual persistent completion status across sessions, this data
+  // would need to be loaded from and saved to a database (e.g., Firestore).
+  late Map<String, bool> _habitCompletionStatus; // Now mutable state
+
+  // For a true streak calculation, you'd need historical completion data per day.
+  // For this demo, currentStreak will represent 'habits completed today'.
+  int _currentStreak = 0; // Initialize dynamically
+  
+  // Longest streak has been removed as per your request.
+  // The concept of a longest streak would require persistent historical data,
+  // which is beyond the scope of this demo's current data management.
 
   @override
   void initState() {
     super.initState();
-    completionStatus = List<bool>.filled(widget.habits.length, false);
+    // Initialize completion status from passed habits from HomePage
+    // Ensure that habits coming from HomePage are used to initialize _habitCompletionStatus
+    _habitCompletionStatus = Map.from(widget.completionStatus);
+    _calculateProgressStats(); // Calculate initial stats
+  }
+
+  // Method to calculate current progress and streak
+  void _calculateProgressStats() {
+    int completed = _habitCompletionStatus.values.where((status) => status).length;
+    setState(() {
+      _currentStreak = completed; // For demo, current streak is habits completed today
+    });
+  }
+
+  // Helper method to get the current completion rate
+  double _getOverallCompletionRate() {
+    int completedCount = _habitCompletionStatus.values.where((status) => status).length;
+    int totalCount = widget.habits.length;
+    return totalCount > 0 ? completedCount / totalCount : 0.0;
   }
 
   @override
   Widget build(BuildContext context) {
-    int completedCount = completionStatus.where((status) => status).length;
+    int completedCount = _habitCompletionStatus.values.where((status) => status).length;
     int totalCount = widget.habits.length;
-    double progress = totalCount > 0 ? completedCount / totalCount : 0;
-    
-    // Calculate completion rate
-    if (totalCount > 0) {
-      _completionRate = completedCount / totalCount;
-    }
+    double overallCompletionRate = _getOverallCompletionRate();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Your Progress'),
+        title: const Text('Your Progress', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.teal[800],
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white), // Set back icon color to white
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Stats Overview
+            // Stats Overview Card
             Card(
               elevation: 3,
               shape: RoundedRectangleBorder(
@@ -64,14 +91,14 @@ class _ProgressPageState extends State<ProgressPage> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Circular progress indicator
                     CircularPercentIndicator(
                       radius: 80,
                       lineWidth: 12,
-                      percent: progress,
+                      percent: overallCompletionRate,
                       center: Text(
-                        '${(progress * 100).toStringAsFixed(0)}%',
+                        '${(overallCompletionRate * 100).toStringAsFixed(0)}%',
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -82,7 +109,7 @@ class _ProgressPageState extends State<ProgressPage> {
                       circularStrokeCap: CircularStrokeCap.round,
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Stats row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -101,8 +128,8 @@ class _ProgressPageState extends State<ProgressPage> {
                         ),
                         _buildStatItem(
                           icon: Icons.local_fire_department,
-                          value: '$_currentStreak days',
-                          label: 'Current Streak',
+                          value: '$_currentStreak habits', // Display current streak
+                          label: 'Completed Today', // Label updated for clarity
                           color: Colors.red,
                         ),
                       ],
@@ -112,8 +139,8 @@ class _ProgressPageState extends State<ProgressPage> {
               ),
             ),
             const SizedBox(height: 20),
-            
-            // Completion Rate Card
+
+            // Completion Rate Card (now only showing Overall Completion Rate)
             Card(
               elevation: 3,
               shape: RoundedRectangleBorder(
@@ -125,7 +152,7 @@ class _ProgressPageState extends State<ProgressPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Completion Rate',
+                      'Overall Completion Rate',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -134,35 +161,25 @@ class _ProgressPageState extends State<ProgressPage> {
                     ),
                     const SizedBox(height: 15),
                     LinearProgressIndicator(
-                      value: _completionRate,
+                      value: overallCompletionRate,
                       minHeight: 12,
                       backgroundColor: Colors.grey[300],
                       color: Colors.teal,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${(_completionRate * 100).toStringAsFixed(1)}% Success',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          'Longest streak: $_longestStreak days',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 10), // Spacing after the progress bar
+                    Center( // Center the completion rate text
+                      child: Text(
+                        '${(overallCompletionRate * 100).toStringAsFixed(1)}% Success',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // Habits header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -175,24 +192,30 @@ class _ProgressPageState extends State<ProgressPage> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Habit list
             widget.habits.isEmpty
                 ? _buildEmptyState()
                 : Column(
-                    children: widget.habits.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final habit = entry.value;
-                      final formattedTime = habit['time'] != null
+                    children: widget.habits.map((habit) {
+                      final String habitId = habit['id'] ?? ''; // Use ID as key if available
+                      final bool isCompleted = _habitCompletionStatus[habitId] ?? false;
+
+                      final formattedTime = habit['time'] != null && habit['time']!.isNotEmpty
                           ? DateFormat('EEE, MMM d • h:mm a').format(
-                              DateTime.parse(habit['time']!))
+                              DateFormat('yyyy-MM-dd HH:mm').parse(habit['time']!))
                           : 'No time set';
-                      
+
                       return _buildHabitCard(
-                        index: index,
                         habit: habit,
                         formattedTime: formattedTime,
-                        isCompleted: completionStatus[index],
+                        isCompleted: isCompleted,
+                        onChanged: (value) {
+                          setState(() {
+                            _habitCompletionStatus[habitId] = value ?? false;
+                            _calculateProgressStats(); // Recalculate when a habit is toggled
+                          });
+                        },
                       );
                     }).toList(),
                   ),
@@ -202,6 +225,7 @@ class _ProgressPageState extends State<ProgressPage> {
     );
   }
 
+  // Builds a single stat item for the overview
   Widget _buildStatItem({
     required IconData icon,
     required String value,
@@ -237,11 +261,12 @@ class _ProgressPageState extends State<ProgressPage> {
     );
   }
 
+  // Builds an individual habit card for the list
   Widget _buildHabitCard({
-    required int index,
     required Map<String, String> habit,
     required String formattedTime,
     required bool isCompleted,
+    required ValueChanged<bool?> onChanged, // Callback for checkbox
   }) {
     return Card(
       elevation: 2,
@@ -255,12 +280,12 @@ class _ProgressPageState extends State<ProgressPage> {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: Colors.teal[50],
+            color: _getCategoryColor(habit['category']).withOpacity(0.2),
             shape: BoxShape.circle,
           ),
           child: Icon(
             _getCategoryIcon(habit['category']),
-            color: Colors.teal[800],
+            color: _getCategoryColor(habit['category']),
             size: 24,
           ),
         ),
@@ -302,7 +327,7 @@ class _ProgressPageState extends State<ProgressPage> {
           ],
         ),
         trailing: SizedBox(
-          width: 100,
+          width: 100, // Adjusted width to prevent overflow
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -322,11 +347,7 @@ class _ProgressPageState extends State<ProgressPage> {
               Checkbox(
                 activeColor: Colors.green,
                 value: isCompleted,
-                onChanged: (value) {
-                  setState(() {
-                    completionStatus[index] = value ?? false;
-                  });
-                },
+                onChanged: onChanged, // Use the passed onChanged callback
               ),
             ],
           ),
@@ -335,6 +356,7 @@ class _ProgressPageState extends State<ProgressPage> {
     );
   }
 
+  // Builds the empty state widget for the progress page
   Widget _buildEmptyState() {
     return Container(
       padding: const EdgeInsets.all(40),
@@ -366,16 +388,10 @@ class _ProgressPageState extends State<ProgressPage> {
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () {
+              // Navigate back to the Home page, assuming it will then lead to Habit Management
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal[800],
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            ),
+            style: Theme.of(context).elevatedButtonTheme.style, // Apply consistent style from main.dart
             child: const Text('Add Habits Now'),
           ),
         ],
@@ -383,6 +399,7 @@ class _ProgressPageState extends State<ProgressPage> {
     );
   }
 
+  // Determines the icon for a given habit category
   IconData _getCategoryIcon(String? category) {
     switch (category?.toLowerCase()) {
       case 'health':
@@ -402,6 +419,7 @@ class _ProgressPageState extends State<ProgressPage> {
     }
   }
 
+  // Determines the color for a given habit category
   Color _getCategoryColor(String? category) {
     final colors = {
       'Health': Colors.green,
@@ -410,6 +428,7 @@ class _ProgressPageState extends State<ProgressPage> {
       'Exercise': Colors.orange,
       'Personal': Colors.pink,
       'Social': Colors.teal,
+      'General': Colors.grey, // Added a default color
     };
     return colors[category] ?? Colors.grey;
   }
